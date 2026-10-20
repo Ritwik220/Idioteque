@@ -3,13 +3,9 @@ use std::sync::Arc;
 use std::default::Default;
 // use wgpu::naga::SwitchValue::Default;
 use winit::{
-    application::ApplicationHandler, event::WindowEvent, event_loop::{self, ActiveEventLoop, EventLoop}, window::{Window, WindowId},
+    application::ApplicationHandler, event::{KeyEvent, WindowEvent}, event_loop::{self, ActiveEventLoop, EventLoop}, keyboard::{KeyCode, PhysicalKey}, window::{Window, WindowId},
 };
 
-#[derive(Default)]
-struct App {
-    window: Option<Window>,
-}
 
 
 // State for wgpu
@@ -23,7 +19,14 @@ struct State {
 }
 
 
+#[derive(Default)]
+struct App {
+    state: Option<State>,
+    window: Option<Arc<Window>>
+}
+
 impl State {
+    // Creating the state
     async fn new(window: Arc<Window>) -> anyhow::Result<State> {
         let size = window.inner_size();
 
@@ -92,6 +95,24 @@ impl State {
             window
         })
     }
+
+
+    // Resize
+    fn resize(mut self:State, widht:u32, height:u32) {
+        if(widht > 0 && height > 0) {
+            self.config.height = height;
+            self.config.width = widht;
+            self.surface.configure(&self.device, &self.config);
+            self.is_surface_config = true;
+        }
+    }
+
+    fn handle_key(&self, event_loop: &ActiveEventLoop, code: KeyCode, is_pressed: bool) {
+        match(code, is_pressed) {
+            (KeyCode::Escape, true) => {event_loop.exit();}
+            _ => {}
+        };
+    }
 }
 
 
@@ -102,22 +123,29 @@ impl ApplicationHandler for App {
             .with_title("Idoteque")
             .with_inner_size(winit::dpi::LogicalSize::new(1280.0, 720.0));
 
-        let window = event_loop
+        let window = Arc::new(event_loop
             .create_window(attributes)
-            .expect("Failed to create window");
+            .expect("Failed to create window"));
 
         window.set_visible(true);
         println!("Window created: {:?}", window.id());
         window.set_visible(true);
         window.focus_window();
+        self.state = Some(pollster::block_on(State::new(window.clone())).unwrap());
         self.window = Some(window);
     }
+
+    // Handling window events
     fn window_event(
         &mut self,
         event_loop: &ActiveEventLoop,
         _window_id: WindowId,
         event: WindowEvent
     ) {
+        let state = match &mut self.state {
+            Some(canvas) => canvas,
+            None => return,
+        };
         match event {
             WindowEvent::CloseRequested => {
                 event_loop.exit();
@@ -130,6 +158,16 @@ impl ApplicationHandler for App {
             WindowEvent::RedrawRequested => {
                 println!("Redraw requested");
             }
+
+            WindowEvent::KeyboardInput {
+                event:
+                    KeyEvent {
+                        physical_key: PhysicalKey::Code(code),
+                        state: key_state,
+                        ..
+                    },
+                ..
+            } => state.handle_key(event_loop, code, key_state.is_pressed()),
 
             _ => {}
         }
