@@ -99,7 +99,7 @@ impl State {
 
 
     // Resize
-    fn resize(mut self:State, widht:u32, height:u32) {
+    fn resize(&mut self, widht:u32, height:u32) {
         if(widht > 0 && height > 0) {
             self.config.height = height;
             self.config.width = widht;
@@ -115,7 +115,7 @@ impl State {
         };
     }
 
-    fn update(mut self) {}
+    fn update(&mut self) {}
 
     fn render(&mut self) -> anyhow::Result<()> {
         self.window.request_redraw();
@@ -155,7 +155,7 @@ impl State {
         });
 
         {
-            let render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            let _render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("render pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: &view,
@@ -191,7 +191,7 @@ impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         println!("Creating window...");
         let attributes = Window ::default_attributes()
-            .with_title("Idoteque")
+            .with_title("Idioteque")
             .with_inner_size(winit::dpi::LogicalSize::new(1280.0, 720.0));
 
         let window = Arc::new(event_loop
@@ -223,11 +223,19 @@ impl ApplicationHandler for App {
             }
 
             WindowEvent::Resized(size) => {
+                state.resize(size.width, size.height);
                 println!("Window resized: {} x {}", size.width, size.height);
             }
 
             WindowEvent::RedrawRequested => {
                 println!("Redraw requested");
+                state.update();
+                match state.render() {
+                    Ok(_) => {},
+                    Err(err) => {
+                        println!("Err: {}", err);
+                    }
+                }
             }
 
             WindowEvent::KeyboardInput {
