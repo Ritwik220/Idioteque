@@ -16,7 +16,8 @@ struct State {
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
     is_surface_config: bool,
-    window: Arc<Window>
+    window: Arc<Window>,
+    render_pipeline: wgpu::RenderPipeline
 }
 
 
@@ -86,6 +87,52 @@ impl State {
         };
 
 
+        // Lodaing the shader
+        let shader = device.create_shader_module(wgpu::include_wgsl!("shader.wsgl"));
+
+        let render_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("render pipeline layout"),
+            bind_group_layouts: &[],
+            immediate_size: 0
+        });
+
+        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("REnder pipeline"),
+            layout: Some(&render_pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: Some("vs_main"), // 1.
+                buffers: &[], // 2.
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+            },
+            fragment: Some(wgpu::FragmentState { // 3.
+                module: &shader,
+                entry_point: Some("fs_main"),
+                targets: &[Some(wgpu::ColorTargetState { // 4.
+                    format: config.format,
+                    blend: Some(wgpu::BlendState::REPLACE),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+                compilation_options: wgpu::PipelineCompilationOptions::default()
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                strip_index_format: None,
+                front_face: wgpu::FrontFace::Ccw,
+                cull_mode: Some(wgpu::Face::Back),
+                polygon_mode: wgpu::PolygonMode::Fill,
+                unclipped_depth: false,
+                conservative: false
+            },
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState {
+                count: 1,
+                mask: !0,
+                alpha_to_coverage_enabled: false
+            },
+            multiview_mask: None,
+            cache: None
+        });
 
         Ok(Self {
             surface,
@@ -93,7 +140,8 @@ impl State {
             config,
             queue,
             is_surface_config: false,
-            window
+            window,
+            render_pipeline
         })
     }
 
@@ -117,7 +165,7 @@ impl State {
 
     fn update(&mut self) {}
 
-    fn render(&mut self) -> anyhow::Result<()> {
+    fn render(&mut self, r: f64, b: f64, g: f64) -> anyhow::Result<()> {
         self.window.request_redraw();
         if !self.is_surface_config {
             return Ok(());
@@ -155,7 +203,7 @@ impl State {
         });
 
         {
-            let _render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("render pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: &view,
@@ -163,9 +211,9 @@ impl State {
                     resolve_target: None,
                     ops: Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: 0.1,
-                            g: 0.2,
-                            b: 0.3,
+                            r: r,
+                            g: g,
+                            b: b,
                             a: 1.0
                         }),
                         store: wgpu::StoreOp::Store
@@ -176,7 +224,9 @@ impl State {
                 occlusion_query_set: None,
                 multiview_mask: None
             });
-
+            
+            render_pass.set_pipeline(&self.render_pipeline);
+            render_pass.draw(0..3, 0..1);
             
         }
         self.queue.submit(std::iter::once(encoder.finish()));
@@ -227,16 +277,22 @@ impl ApplicationHandler for App {
                 println!("Window resized: {} x {}", size.width, size.height);
             }
 
+            WindowEvent::CursorMoved { device_id, position } => {
+                let _ = state.render(0.5, 0.6, 0.7);
+            }
+
             WindowEvent::RedrawRequested => {
                 println!("Redraw requested");
                 state.update();
-                match state.render() {
+                match state.render(1.0 , 0.2, 0.3) {
                     Ok(_) => {},
                     Err(err) => {
                         println!("Err: {}", err);
                     }
                 }
             }
+
+            
 
             WindowEvent::KeyboardInput {
                 event:
