@@ -17,7 +17,9 @@ struct State {
     config: wgpu::SurfaceConfiguration,
     is_surface_config: bool,
     window: Arc<Window>,
-    render_pipeline: wgpu::RenderPipeline
+    render_pipeline: wgpu::RenderPipeline,
+    is_cursor_moved: bool,
+    is_cursor_initialized: bool
 }
 
 
@@ -97,7 +99,7 @@ impl State {
         });
 
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("REnder pipeline"),
+            label: Some("Render pipeline"),
             layout: Some(&render_pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &shader,
@@ -141,14 +143,16 @@ impl State {
             queue,
             is_surface_config: false,
             window,
-            render_pipeline
+            render_pipeline,
+            is_cursor_moved: false,
+            is_cursor_initialized: false,
         })
     }
 
 
     // Resize
     fn resize(&mut self, widht:u32, height:u32) {
-        if(widht > 0 && height > 0) {
+        if widht > 0 && height > 0 {
             self.config.height = height;
             self.config.width = widht;
             self.surface.configure(&self.device, &self.config);
@@ -278,13 +282,33 @@ impl ApplicationHandler for App {
             }
 
             WindowEvent::CursorMoved { device_id, position } => {
-                let _ = state.render(0.5, 0.6, 0.7);
+                // let _ = state.render(0.5, 0.6, 0.7);
+                // println!("CursorMoved event: {:?}", position);
+                if state.is_cursor_initialized {
+                    state.is_cursor_moved = true;
+                }
+                else {
+                    state.is_cursor_initialized = true;
+                }
             }
 
             WindowEvent::RedrawRequested => {
                 println!("Redraw requested");
                 state.update();
-                match state.render(1.0 , 0.2, 0.3) {
+                let r: f64;
+                let b:f64;
+                let g:f64;
+                if state.is_cursor_moved {
+                    r=0.5;
+                    b=0.6;
+                    g=0.7;
+                }
+                else {
+                    r=1.0;
+                    b=0.2;
+                    g=0.3;
+                }
+                match state.render(r , b, g) {
                     Ok(_) => {},
                     Err(err) => {
                         println!("Err: {}", err);
