@@ -1,6 +1,7 @@
 
 use std::sync::Arc;
 use std::default::Default;
+use image::GenericImageView;
 use wgpu::{Operations, TextureViewDescriptor, util::DeviceExt};
 // use wgpu::naga::SwitchValue::Default;
 use winit::{
@@ -113,6 +114,35 @@ impl State {
             desired_maximum_frame_latency: 2,
             color_space: wgpu::SurfaceColorSpace::Auto,
         };
+
+
+        // Loading an image
+        let diffuse_bytes = include_bytes!("images/happy-tree.png");
+        let diffuse_image = image::load_from_memory(diffuse_bytes).unwrap();
+        let diffuse_rgba = diffuse_image.to_rgb8();
+
+
+        use image::GenericImageView;
+        let dimensions = diffuse_image.dimensions();
+
+
+        // Creating the texture 
+        let texture_size = wgpu::Extent3d {
+            width: dimensions.0,
+            height: dimensions.1,
+            depth_or_array_layers: 0
+        };
+
+        let diffuse_texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("diffuse texture"),
+            size: texture_size,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8UnormSrgb,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+        });
 
 
         // Lodaing the shader
